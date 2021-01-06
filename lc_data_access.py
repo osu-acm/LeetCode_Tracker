@@ -160,8 +160,9 @@ class LC_Access():
 
         r_str = "Weekly Recap.\n`"
         for count, username in data:
-            r_str += "{}:  \t{} problems solved\t\t\n".format(username, count)
-
+            r_str += username.ljust(15)
+            r_str += "{} problems solved.".format(count)
+            r_str += "\n"
         return r_str + '`'
 
     def _get_users_week(self, username, range_start):
@@ -171,17 +172,17 @@ class LC_Access():
         Returns: number of problems the user solved as an int.
         This is a helper method for weekly_recap()
         """
-        r = 0
+        uniq_solved = set()
         submission_list = self._get_user_submission_list(username)
         for submission in submission_list:
             timestamp = int(submission["timestamp"])
             time_delta = timestamp - range_start
-            if time_delta >= 0:
-                r += 1
+            if (time_delta >= 0) and (submission["statusDisplay"] == "Accepted") and (submission["title"] not in uniq_solved):
+                uniq_solved.add(submission["title"])
             else:
                 break
 
-        return r
+        return len(uniq_solved)
 
 
     def _format_recent_problem(self, user_data):
