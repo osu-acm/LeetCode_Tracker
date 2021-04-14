@@ -177,8 +177,9 @@ class LC_Access():
         for submission in submission_list:
             timestamp = int(submission["timestamp"])
             time_delta = timestamp - range_start
-            if (time_delta >= 0) and (submission["statusDisplay"] == "Accepted") and (submission["title"] not in uniq_solved):
-                uniq_solved.add(submission["title"])
+            if (time_delta >= 0):
+                if (submission["statusDisplay"] == "Accepted") and (submission["title"] not in uniq_solved):
+                    uniq_solved.add(submission["title"])
             else:
                 break
 
