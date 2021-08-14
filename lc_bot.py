@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 import lc_data_access
 
 lc_access = lc_data_access.LC_Access()
@@ -95,7 +95,7 @@ bot_test_channel_id = 791542249031860245;
 async def called_once_a_day():
     message_channel = client.get_channel(bot_test_channel_id)
     print(f"Got channel {message_channel}")
-    await message_channel.send("Keep up the good work!")
+    await message_channel.channel.send(lc_access.weekly_recap())
 
 @called_once_a_day.before_loop
 async def before():
