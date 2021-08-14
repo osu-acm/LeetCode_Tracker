@@ -89,21 +89,24 @@ class MyClient(discord.Client):
 token = ''
 with open("token.txt", "r") as infile:
     token = infile.readline().strip()
-bot_test_channel_id = 791542249031860245;
 
-@tasks.loop(minutes=3)
-async def called_once_a_day():
-    message_channel = client.get_channel(bot_test_channel_id)
-    print(f"Got channel {message_channel}")
-    await message_channel.channel.send(lc_access.weekly_recap())
+# bot_channel = 791542249031860245;    # <-- This channel is the hidden bot-testing channel
+bot_channel = 799064821517385750;      # <-- This channel is the main leetcode-bot channel
 
-@called_once_a_day.before_loop
+# Send a weekly recap every week
+@tasks.loop(hours=168)
+async def weekly_message():
+    message_channel = client.get_channel(bot_channel)
+    print(f"Sending weekly message to: {message_channel}")
+    await message_channel.send(lc_access.weekly_recap())
+    await message_channel.send("Nice work everyone! Use the `!help` command for more commands.")
+
+@weekly_message.before_loop
 async def before():
     await client.wait_until_ready()
-    print("Finished waiting")
 
 client = MyClient()
-called_once_a_day.start()
+weekly_message.start()
 client.run(token)
 
 

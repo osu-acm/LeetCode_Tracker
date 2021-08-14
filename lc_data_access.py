@@ -158,7 +158,7 @@ class LC_Access():
 
         data.sort(reverse=True)
 
-        r_str = "Weekly Recap.\n`"
+        r_str = "Weekly Recap:\n`"
         for count, username in data:
             r_str += username.ljust(15)
             r_str += "{} problems solved.".format(count)
