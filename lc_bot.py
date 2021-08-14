@@ -1,4 +1,5 @@
 import discord
+from discord.ext import commands, tasks
 import lc_data_access
 
 lc_access = lc_data_access.LC_Access()
@@ -84,12 +85,25 @@ class MyClient(discord.Client):
             await message.channel.send('pong')
             return
 
-
 # Get the discord bot token.
 token = ''
 with open("token.txt", "r") as infile:
     token = infile.readline().strip()
+bot_test_channel_id = 791542249031860245;
+
+@tasks.loop(minutes=3)
+async def called_once_a_day():
+    message_channel = client.get_channel(bot_test_channel_id)
+    print(f"Got channel {message_channel}")
+    await message_channel.send("Keep up the good work!")
+
+@called_once_a_day.before_loop
+async def before():
+    await client.wait_until_ready()
+    print("Finished waiting")
 
 client = MyClient()
+called_once_a_day.start()
 client.run(token)
+
 
