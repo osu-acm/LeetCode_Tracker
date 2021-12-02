@@ -11,6 +11,10 @@ class MyClient(discord.Client):
     
     async def on_message(self, message):
 
+        # Make sure the message is in the bot-testing channel
+        if message.channel.id != 791542249031860245:
+            return
+
         # Don't respond to ourselves.
         if message.author == self.user:
             return
