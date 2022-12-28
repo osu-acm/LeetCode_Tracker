@@ -1,4 +1,4 @@
-import requests
+import grequests
 import time
 import json
 
@@ -53,7 +53,11 @@ class LcAccess:
         Returns a result message string.
         """
         if username not in self.users:
-            status_code, user_data = self._fetch_user_data(username)
+            try:
+                status_code, user_data = self._fetch_single_user_data(username)
+            except Exception:
+                return "Exception caught in fetching data."
+
             if status_code != 200 or 'errors' in user_data:
                 return "Unrecognized user. Please try again."
 
@@ -63,14 +67,15 @@ class LcAccess:
         else:
             return "{} is already on the list!".format(username)
 
+    def get_users_str(self):
+        """
+        Return a string with a list of all the users.
+        """
+        return str(self.users)
+
     # Functions for getting users data from LeetCode:
 
-    def _fetch_user_data(self, username):
-        """
-        Takes a username as input and returns the data from LeetCode on the user.
-        Returns: status_code, user_data
-        """
-
+    def _format_post_request(self, username):
         url = 'https://leetcode.com/graphql'
         headers = {'accept': '*/*', 'accept-encoding': 'gzip', 'accept-language': 'en-US,en;q=0.9',
                    'cache-control': 'no-cache', 'content-length': '411', 'content-type': 'application/json'}
@@ -97,28 +102,41 @@ class LcAccess:
         }
         """
         }
+        return grequests.post(url, headers=headers, data=json.dumps(body))
 
-        req = requests.post(url, headers=headers, data=json.dumps(body))
-        status_code = req.status_code
-        user_data = json.loads(req.text)
+    def _fetch_multiple_users_data(self, usernames):
+        """Calls LeetCode API for user data with multiple requests in parallel."""
+        reqs = [self._format_post_request(username) for username in usernames]
+        results = grequests.map(reqs, size=10)
+        return results
+
+    def _fetch_single_user_data(self, username):
+        """
+        Takes a username as input and returns the data from LeetCode on the user.
+        Returns: status_code, user_data
+        """
+
+        req = self._format_post_request(username)
+        result = grequests.map([req])[0]
+        status_code = result.status_code
+        user_data = json.loads(result.text)
         return status_code, user_data
 
-    def _get_user_submission_list(self, username):
+    def _get_user_submission_data_from_json(self, user_result):
         """
-        Given a username, returns a list of the user's submissions.
+        Given a json string result for a user, validates and returns their recent submissions.
         """
-        status_code, user_data = self._fetch_user_data(username)
+        status_code, user_data = user_result.status_code, json.loads(user_result.text)
         if status_code != 200:
-            return 0
+            return None
 
         return user_data["data"]["recentSubmissionList"]
 
-    def _format_recent_problem(self, user_data):
+    def _format_recent_problem(self, submissions):
         """
-        Given user_data JSON object from LeetCode, return a formatted string of the user's most recent submission.
+        Given a list of submissions to LeetCode, return a formatted string of the user's most recent submission.
         """
-        problem = user_data["data"]["recentSubmissionList"][0]
-
+        problem = submissions[0]
         timestamp = int(problem["timestamp"])
         readable_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(timestamp))
 
@@ -136,21 +154,15 @@ Language:        {}
         Gets a users most recent submission, returns it as a pretty-formatted string.
         """
         try:
-            status_code, user_data = self._fetch_user_data(username)
+            status_code, user_data = self._fetch_single_user_data(username)
             if status_code != 200:
                 return "Server error. @Leadership you might want to check on this."
             elif 'errors' in user_data:
                 return "That user does not exist. Please try again."
 
-            return self._format_recent_problem(user_data)
+            return self._format_recent_problem(user_data["data"]["recentSubmissionList"])
         except Exception as identifier:
             return "Fail in query for {}".format(username)
-
-    def get_users_str(self):
-        """
-        Return a string with a list of all the users.
-        """
-        return str(self.users)
 
     def recent_submissions_for_each_user(self):
         """
@@ -160,23 +172,38 @@ Language:        {}
         if len(self.users) > 5:
             return "Too many users to print in one message. Please user the  `!get <username>`  command instead."
 
-        for user in self.users:
-            problem = self.get_user_most_recent(user)
-            r_str += "\n{}'s most recent submission:\n".format(user)
-            r_str += problem
-            r_str += "\n"
+        try:
+            results = self._fetch_multiple_users_data(self.users)
+        except Exception:
+            return "Exception caught in fetching data."
+
+        for username, user_result in zip(self.users, results):
+            submissions = self._get_user_submission_data_from_json(user_result)
+            if not submissions:
+                pass
+            else:
+                problem = self._format_recent_problem(submissions)
+                r_str += "\n{}'s most recent submission:\n".format(username)
+                r_str += problem
+                r_str += "\n"
 
         return r_str
 
-    def _get_users_week(self, username, range_start):
+    def _calculate_num_user_submissions_in_last_week(self, user_result, range_start):
         """
         Given a user, this gets the number of problems a user solved in the last week.
-        Params: username of the user, time in unix epoch from one week ago.
+        Params:
+            user_result: the result of the fetch for data on the user
+            range_start: time in unix epoch from one week ago.
         Returns: number of problems the user solved as an int.
         This is a helper method for weekly_recap()
         """
         uniq_solved = set()
-        submission_list = self._get_user_submission_list(username)
+
+        submission_list = self._get_user_submission_data_from_json(user_result)
+        if not submission_list:
+            return 0
+
         for submission in submission_list:
             timestamp = int(submission["timestamp"])
             time_delta = timestamp - range_start
@@ -194,9 +221,15 @@ Language:        {}
         """
         data = []
         range_start = time.time() - 604800  # Gets time from epoch 1 week ago
-        for user in self.users:
-            r = self._get_users_week(user, range_start)
-            data.append((r, user))
+
+        try:
+            results = self._fetch_multiple_users_data(self.users)
+        except Exception:
+            return "Exception caught in fetching data."
+
+        for username, user_result in zip(self.users, results):
+            r = self._calculate_num_user_submissions_in_last_week(user_result, range_start)
+            data.append((r, username))
 
         data.sort(reverse=True)
 

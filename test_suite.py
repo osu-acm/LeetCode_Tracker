@@ -8,8 +8,8 @@ import json
 
 @pytest.fixture
 def mock_post(mocker):
-    mock = Mock()
-    mocker.patch('requests.post', return_value=mock)
+    mock = [Mock()]
+    mocker.patch('grequests.map', return_value=mock)
     return mock
 
 
@@ -55,8 +55,8 @@ def test_remove_missing_user(lc_access):
 
 
 def test_get_user_most_recent(lc_access, mock_post):
-    mock_post.status_code = 200
-    mock_post.text = json.dumps(fake_lc_api_response)
+    mock_post[0].status_code = 200
+    mock_post[0].text = json.dumps(fake_lc_api_response)
 
     # Test getting a user's most recent submission
     recent = lc_access.get_user_most_recent('fake_user')
@@ -73,8 +73,8 @@ Language:        python3
 
 
 def test_users_recents(lc_access, mock_post):
-    mock_post.status_code = 200
-    mock_post.text = json.dumps(fake_lc_api_response)
+    mock_post[0].status_code = 200
+    mock_post[0].text = json.dumps(fake_lc_api_response)
 
     recents = lc_access.recent_submissions_for_each_user()
     assert recents == """
@@ -89,8 +89,8 @@ Language:        python3
 
 
 def test_weekly_recap(lc_access, mock_post):
-    mock_post.status_code = 200
-    mock_post.text = json.dumps(fake_lc_api_response)
+    mock_post[0].status_code = 200
+    mock_post[0].text = json.dumps(fake_lc_api_response)
 
     recents = lc_access.weekly_recap_leaderboard()
 
